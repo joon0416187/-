@@ -3,10 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ArrowLeft, Send, User as UserIcon, Bot, Loader2, FileText, Save, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Send, User as UserIcon, Bot, Loader2, FileText, Save, CheckCircle2, Clock, MessageSquare } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import { useCoaching, Message } from '../contexts/CoachingContext';
+import { useTimer } from '../contexts/TimerContext';
 
 interface FileData {
   id: string;
@@ -23,10 +24,12 @@ export default function Coaching() {
   const location = useLocation();
   const navigate = useNavigate();
   const { messages, setMessages, selectedFileIds } = useCoaching();
+  const { timerActive, timerSeconds, formatTime } = useTimer();
   const [files, setFiles] = useState<FileData[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
   const [savedNoteIds, setSavedNoteIds] = useState<string[]>([]);
+  const [isSavingConversation, setIsSavingConversation] = useState(false);
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -76,7 +79,17 @@ export default function Coaching() {
     setIsTyping(true);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      let apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        try {
+          const res = await fetch('/api/config');
+          const data = await res.json();
+          apiKey = data.geminiApiKey;
+        } catch (e) {
+          console.warn('Failed to fetch API key from server', e);
+        }
+      }
+
       if (!apiKey) {
         throw new Error('GEMINI_API_KEY is not configured');
       }
@@ -166,6 +179,32 @@ ${historyContext}
     }
   };
 
+  const saveConversation = async () => {
+    if (!user || isSavingConversation || messages.length <= 1) return;
+    setIsSavingConversation(true);
+    try {
+      const chatContent = messages
+        .filter(m => m.id !== 'init')
+        .map(m => `**${m.role === 'user' ? '학생' : '에듀코치'}**\n${m.text}\n`)
+        .join('\n---\n\n');
+      
+      const fullContent = `# 대화 내역 저장\n\n${chatContent}`;
+
+      await addDoc(collection(db, 'notes'), {
+        userId: user.uid,
+        content: fullContent,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      alert('현재 대화가 마이페이지에 저장되었습니다.');
+    } catch (err) {
+      console.error('Failed to save conversation:', err);
+      alert('대화 저장에 실패했습니다.');
+    } finally {
+      setIsSavingConversation(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -188,6 +227,22 @@ ${historyContext}
             <h1 className="text-lg font-bold text-gray-900 leading-tight font-display">AI 에듀코치</h1>
             <p className="text-xs text-green-600 font-medium">{files.length}개의 파일 분석 중</p>
           </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {timerActive && (
+            <div className="hidden sm:flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-mono font-medium text-sm border border-blue-100">
+              <Clock size={14} />
+              {formatTime(timerSeconds)}
+            </div>
+          )}
+          <button
+            onClick={saveConversation}
+            disabled={isSavingConversation || messages.length <= 1}
+            className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSavingConversation ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            <span className="hidden sm:inline">현재 대화 저장</span>
+          </button>
         </div>
       </header>
 

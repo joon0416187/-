@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTimer } from '../contexts/TimerContext';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
@@ -20,12 +21,9 @@ interface StudySession {
 
 export default function MyPage() {
   const { user } = useAuth();
+  const { timerActive, timerSeconds, toggleTimer, endSession, formatTime } = useTimer();
   const [notes, setNotes] = useState<Note[]>([]);
   const [totalStudyTime, setTotalStudyTime] = useState(0);
-
-  const [timerActive, setTimerActive] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -55,42 +53,8 @@ export default function MyPage() {
     return () => {
       unsubscribeNotes();
       unsubscribeSessions();
-      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [user]);
-
-  useEffect(() => {
-    if (timerActive) {
-      timerRef.current = setInterval(() => {
-        setTimerSeconds(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [timerActive]);
-
-  const toggleTimer = () => setTimerActive(!timerActive);
-
-  const endSession = async () => {
-    if (!user || timerSeconds === 0) return;
-    setTimerActive(false);
-    
-    try {
-      await addDoc(collection(db, 'studySessions'), {
-        userId: user.uid,
-        durationSeconds: timerSeconds,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-    } catch (err) {
-      console.error("Failed to save study session", err);
-    }
-    
-    setTimerSeconds(0);
-  };
 
   const deleteNote = async (id: string) => {
     if (!confirm('노트를 삭제하시겠습니까?')) return;
@@ -99,18 +63,6 @@ export default function MyPage() {
     } catch (err) {
       console.error('Failed to delete note:', err);
     }
-  };
-
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    return [
-      hrs.toString().padStart(2, '0'),
-      mins.toString().padStart(2, '0'),
-      secs.toString().padStart(2, '0')
-    ].join(':');
   };
 
   if (!user) return null;
