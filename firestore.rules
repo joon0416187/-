@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Validations
+    function isValidFile(data) {
+      return data.keys().hasAll(['userId', 'name', 'url', 'type', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 6
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 256
+        && data.url is string && data.url.size() > 0 && data.url.size() <= 1048576  // Allow up to 1MB string
+        && data.type is string && data.type.size() > 0 && data.type.size() <= 128
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidFileUpdate(data) {
+      return data.keys().hasAll(['userId', 'name', 'url', 'type', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 6
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 256
+        && data.url is string && data.url.size() > 0 && data.url.size() <= 1048576  // Allow up to 1MB string
+        && data.type is string && data.type.size() > 0 && data.type.size() <= 128
+        && data.updatedAt == request.time;
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['userId', 'content', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 4
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128
+        && data.content is string && data.content.size() > 0 && data.content.size() <= 1048576
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidNoteUpdate(data) {
+      return data.keys().hasAll(['userId', 'content', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 4
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128
+        && data.content is string && data.content.size() > 0 && data.content.size() <= 1048576
+        && data.updatedAt == request.time;
+    }
+
+    function isValidStudySession(data) {
+      return data.keys().hasAll(['userId', 'durationSeconds', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 4
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128
+        && data.durationSeconds is number
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    match /files/{fileId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && isValidId(fileId) 
+        && isValidFile(incoming()) 
+        && incoming().userId == request.auth.uid;
+        
+      allow update: if isSignedIn() 
+        && isValidId(fileId) 
+        && isValidFileUpdate(incoming()) 
+        && incoming().userId == request.auth.uid 
+        && existing().userId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt', 'name'])
+        && incoming().createdAt == existing().createdAt
+        && incoming().url == existing().url
+        && incoming().type == existing().type;
+        
+      allow delete: if isSignedIn() && isValidId(fileId) && existing().userId == request.auth.uid;
+    }
+
+    match /notes/{noteId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && isValidId(noteId) 
+        && isValidNote(incoming()) 
+        && incoming().userId == request.auth.uid;
+        
+      allow update: if isSignedIn() 
+        && isValidId(noteId) 
+        && isValidNoteUpdate(incoming()) 
+        && incoming().userId == request.auth.uid 
+        && existing().userId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt', 'content'])
+        && incoming().createdAt == existing().createdAt;
+        
+      allow delete: if isSignedIn() && isValidId(noteId) && existing().userId == request.auth.uid;
+    }
+
+    match /studySessions/{sessionId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && isValidId(sessionId) 
+        && isValidStudySession(incoming()) 
+        && incoming().userId == request.auth.uid;
+        
+      allow delete: if isSignedIn() && isValidId(sessionId) && existing().userId == request.auth.uid;
+    }
+  }
+}

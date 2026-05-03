@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "File": {
+      "title": "File",
+      "description": "Uploaded file metadata",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Original file name"
+        },
+        "url": {
+          "type": "string",
+          "description": "Download URL from Firebase Storage"
+        },
+        "type": {
+          "type": "string",
+          "description": "MIME type"
+        },
+        "createdAt": {
+          "type": "object",
+          "description": "Firestore Timestamp"
+        },
+        "updatedAt": {
+          "type": "object",
+          "description": "Firestore Timestamp"
+        }
+      },
+      "required": ["userId", "name", "url", "type", "createdAt", "updatedAt"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Saved AI explanation notes",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "object" },
+        "updatedAt": { "type": "object" }
+      },
+      "required": ["userId", "content", "createdAt", "updatedAt"]
+    },
+    "StudySession": {
+       "title": "StudySession",
+       "description": "Recorded study time",
+       "type": "object",
+       "properties": {
+         "userId": { "type": "string" },
+         "durationSeconds": { "type": "number" },
+         "createdAt": { "type": "object" },
+         "updatedAt": { "type": "object" }
+       },
+       "required": ["userId", "durationSeconds", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/files/{fileId}": {
+      "schema": "File",
+      "description": "Storage for all uploaded file metadata"
+    },
+    "/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Storage for saved AI notes"
+    },
+    "/studySessions/{sessionId}": {
+      "schema": "StudySession",
+      "description": "Storage for study session records"
+    }
+  }
+}
