@@ -156,8 +156,14 @@ ${historyContext}
       console.error('Coaching Error:', err);
       
       let errorMessage = '죄송합니다. 오류가 발생하여 답변을 작성하지 못했습니다. 잠시 후 다시 시도해주세요.';
-      if (err instanceof Error && err.message === 'GEMINI_API_KEY is not configured') {
-        errorMessage = 'Gemini API 키가 설정되지 않았습니다.\n\nNetlify 배포 시 **Site configuration > Environment variables** 에서 `VITE_GEMINI_API_KEY` 환경 변수를 추가해주세요.\n\n**중요:** 환경 변수를 추가한 후 반드시 Netlify의 Deploys 탭에서 **Trigger deploy -> Clear cache and deploy site**를 눌러 사이트를 "새로 빌드"해야 키가 적용됩니다. (Vite 특성상 빌드 시점에 키가 포함되어야 합니다.)\n\n키 발급은 [Google AI Studio](https://aistudio.google.com/app/apikey)에서 무료로 받을 수 있습니다.';
+      if (err?.message) {
+        if (err.message === 'GEMINI_API_KEY is not configured') {
+          errorMessage = 'Gemini API 키가 설정되지 않았습니다.\n\nNetlify 배포 시 **Site configuration > Environment variables** 에서 `VITE_GEMINI_API_KEY` 환경 변수를 추가해주세요.\n\n**중요:** 환경 변수를 추가한 후 반드시 Netlify의 Deploys 탭에서 **Trigger deploy -> Clear cache and deploy site**를 눌러 사이트를 "새로 빌드"해야 키가 적용됩니다. (Vite 특성상 빌드 시점에 키가 포함되어야 합니다.)\n\n키 발급은 [Google AI Studio](https://aistudio.google.com/app/apikey)에서 무료로 받을 수 있습니다.';
+        } else {
+          errorMessage = `오류가 발생했습니다: ${err.message}\n\n잠시 후 다시 시도해주세요.`;
+        }
+      } else {
+        errorMessage = `알 수 없는 오류가 발생했습니다: ${JSON.stringify(err)}\n\n잠시 후 다시 시도해주세요.`;
       }
       
       setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: errorMessage }]);

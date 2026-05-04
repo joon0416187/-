@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { LogOut, UploadCloud, File, Image as ImageIcon, Copy, CheckCircle2, Link as LinkIcon, AlertCircle, MessageSquare } from 'lucide-react';
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+import { LogOut, UploadCloud, File, Image as ImageIcon, Copy, CheckCircle2, Link as LinkIcon, AlertCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCoaching } from '../contexts/CoachingContext';
 
@@ -42,6 +42,7 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -77,6 +78,19 @@ export default function Home() {
 
   const handleLogout = () => {
     signOut(auth);
+  };
+
+  const confirmDelete = async () => {
+    if (!fileToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'files', fileToDelete));
+      setSelectedFileIds(prev => prev.filter(id => id !== fileToDelete));
+      setFileToDelete(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'files');
+      setError('파일 삭제 중 오류가 발생했습니다.');
+      setFileToDelete(null);
+    }
   };
 
   const toggleFileSelection = (id: string) => {
@@ -292,9 +306,17 @@ export default function Home() {
                       <button 
                         onClick={() => copyToClipboard(htmlCode, `html-${file.id}`)}
                         className="flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 border border-transparent rounded-md transition font-medium"
+                        title="HTML 복사"
                       >
                         {copiedId === `html-${file.id}` ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-                        HTML 코드 복사
+                        <span className="hidden sm:inline">HTML 복사</span>
+                      </button>
+                      <button
+                        onClick={() => setFileToDelete(file.id)}
+                        className="flex items-center justify-center p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 border border-transparent rounded-md transition"
+                        title="삭제"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </div>
@@ -304,6 +326,32 @@ export default function Home() {
           )}
         </div>
       </main>
+
+      {fileToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 overflow-hidden">
+            <div className="flex justify-center mb-4 text-red-500">
+              <AlertCircle size={48} />
+            </div>
+            <h3 className="text-xl font-bold text-center text-gray-900 mb-2">파일 삭제</h3>
+            <p className="text-center text-gray-600 mb-6 font-medium">정말로 이 파일을 삭제하시겠습니까?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setFileToDelete(null)}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-semibold transition"
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
+              >
+                삭제하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
